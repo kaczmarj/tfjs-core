@@ -170,13 +170,13 @@
 
 
   <!-- OLD - June 21, 2018 -->
-  <script src="https://unpkg.com/@tensorflow/tfjs@0.11.7/dist/tf.js"></script>
+  <!-- <script src="https://unpkg.com/@tensorflow/tfjs@0.11.7/dist/tf.js"></script> -->
 
 
   <!-- NEW -->
-<!--   <script src="./tf-core.js"></script>
+  <script src="./tf-core.js"></script>
   <script src="https://unpkg.com/@tensorflow/tfjs-converter/dist/tf-converter.js"></script>
- -->
+
 
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet@0.2.3"></script>
 
@@ -190,7 +190,7 @@
       // return await tf.loadFrozenModel(
       //   'https://storage.googleapis.com/tfjs-models/savedmodel/mobilenet_v1_1.0_224/optimized_model.pb',
       //   'https://storage.googleapis.com/tfjs-models/savedmodel/mobilenet_v1_1.0_224/weights_manifest.json');
-      return await posenet.load();
+      return await posenet.load(0.75);
     }
 
     // const zeros = tf.zeros([1, 224, 224, 3]);
@@ -200,7 +200,7 @@
       // Place model prediction code here.
       //////////////////////////////////
       // return model.predict(zeros);
-      return model.estimateSinglePose(zeros);
+      return model.estimateSinglePose(zeros, 0.5, false, 16);
     }
   </script>
   <script>
