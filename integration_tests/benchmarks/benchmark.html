@@ -170,13 +170,13 @@
 
 
   <!-- OLD - June 21, 2018 -->
-  <!-- <script src="https://unpkg.com/@tensorflow/tfjs@0.13.5/dist/tf.js"></script> -->
+  <script src="https://unpkg.com/@tensorflow/tfjs@0.11.7/dist/tf.js"></script>
 
 
   <!-- NEW -->
-  <script src="https://unpkg.com/@tensorflow/tfjs-core/dist/tf-core.js"></script>
+<!--   <script src="https://unpkg.com/@tensorflow/tfjs-core/dist/tf-core.js"></script>
   <script src="https://unpkg.com/@tensorflow/tfjs-converter/dist/tf-converter.js"></script>
-
+ -->
 
   <!-- <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet@0.2.3"></script> -->
 
@@ -187,11 +187,11 @@
       //////////////////////////////////
       // Place model loading code here.
       //////////////////////////////////
-      // return await tf.loadFrozenModel(
-      //   'https://storage.googleapis.com/tfjs-models/savedmodel/mobilenet_v1_1.0_224/tensorflowjs_model.pb',
-      //   'https://storage.googleapis.com/tfjs-models/savedmodel/mobilenet_v1_1.0_224/weights_manifest.json');
-      return await tf.loadGraphModel(
-        'https://storage.googleapis.com/tfjs-models/savedmodel/mobilenet_v1_1.0_224/model.json');
+      return await tf.loadFrozenModel(
+        'https://storage.googleapis.com/tfjs-models/savedmodel/mobilenet_v1_1.0_224/tensorflowjs_model.pb',
+        'https://storage.googleapis.com/tfjs-models/savedmodel/mobilenet_v1_1.0_224/weights_manifest.json');
+      // return await tf.loadGraphModel(
+      //   'https://storage.googleapis.com/tfjs-models/savedmodel/mobilenet_v1_1.0_224/model.json');
       // return await posenet.load(0.75);
     }
 
