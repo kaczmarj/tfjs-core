@@ -16,7 +16,7 @@
  */
 
 import {ENV} from '../environment';
-import {Tensor, Tensor3D, Tensor4D} from '../tensor';
+import {Tensor, Tensor3D, Tensor4D, Tensor5D} from '../tensor';
 import {convertToTensor} from '../tensor_util_env';
 import {TensorLike} from '../types';
 import * as util from '../util';
@@ -503,7 +503,7 @@ function maxPool3DImpl_<T extends Tensor4D|Tensor5D>(
 
   const res = ENV.engine.runKernel((backend, save) => {
     const y = backend.maxPool3d(x5D, convInfo);
-    save({x5D, y});
+    save([x5D, y]);
     return y;
   }, {x: x5D});
   if (reshapedTo5D) {
