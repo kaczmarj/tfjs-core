@@ -77,7 +77,7 @@ import {GatherNDProgram} from './webgl/gather_nd_gpu';
 import {GPGPUContext} from './webgl/gpgpu_context';
 import * as gpgpu_math from './webgl/gpgpu_math';
 import {GPGPUBinary, GPGPUProgram, TensorData} from './webgl/gpgpu_math';
-import {Im2ColProgram} from './webgl/im2col_gpu';
+import {Im2ColPackedProgram} from './webgl/im2col_packed_gpu';
 import {LRNProgram} from './webgl/lrn_gpu';
 import {LRNGradProgram} from './webgl/lrn_grad_gpu';
 import {MaxPool2DBackpropProgram} from './webgl/max_pool_backprop_gpu';
@@ -135,6 +135,16 @@ export interface WebGLMemoryInfo extends MemoryInfo {
 export interface WebGLTimingInfo extends TimingInfo {
   uploadWaitMs: number;
   downloadWaitMs: number;
+}
+
+const binaryCaches: {[webGLVersion: string]: {[key: string]: GPGPUBinary}} = {};
+
+function getBinaryCache(webGLVersion: number) {
+  if (webGLVersion in binaryCaches) {
+    return binaryCaches[webGLVersion];
+  }
+  binaryCaches[webGLVersion] = {};
+  return binaryCaches[webGLVersion];
 }
 
 function mapActivationToShaderProgram(
@@ -569,7 +579,7 @@ export class MathBackendWebGL implements KernelBackend {
   }
 
   private textureManager: TextureManager;
-  private binaryCache: {[key: string]: GPGPUBinary} = {};
+  private binaryCache: {[key: string]: GPGPUBinary};
   private gpgpuCreatedLocally: boolean;
 
   constructor(private gpgpu?: GPGPUContext) {
@@ -579,10 +589,12 @@ export class MathBackendWebGL implements KernelBackend {
 
     if (gpgpu == null) {
       const gl = getWebGLContext(ENV.get('WEBGL_VERSION'));
+      this.binaryCache = getBinaryCache(ENV.get('WEBGL_VERSION'));
       this.gpgpu = new GPGPUContext(gl);
       this.canvas = gl.canvas;
       this.gpgpuCreatedLocally = true;
     } else {
+      this.binaryCache = {};
       this.gpgpuCreatedLocally = false;
       this.canvas = gpgpu.gl.canvas;
     }
@@ -1278,16 +1290,14 @@ export class MathBackendWebGL implements KernelBackend {
     const program = ENV.get('WEBGL_PACK_BINARY_OPERATIONS') ?
         new BinaryOpPackedProgram(binaryop_packed_gpu.MIN, a.shape, b.shape) :
         new BinaryOpProgram(binaryop_gpu.MIN, a.shape, b.shape);
-    const customSetup = program.getCustomSetupFunc();
-    return this.compileAndRun(program, [a, b], null, customSetup);
+    return this.compileAndRun(program, [a, b]);
   }
 
   mod(a: Tensor, b: Tensor): Tensor {
     const program = ENV.get('WEBGL_PACK_BINARY_OPERATIONS') ?
         new BinaryOpPackedProgram(binaryop_packed_gpu.MOD, a.shape, b.shape) :
         new BinaryOpProgram(binaryop_gpu.MOD, a.shape, b.shape);
-    const customSetup = program.getCustomSetupFunc();
-    return this.compileAndRun(program, [a, b], null, customSetup);
+    return this.compileAndRun(program, [a, b]);
   }
 
   max(x: Tensor, axes: number[]): Tensor {
@@ -1311,8 +1321,7 @@ export class MathBackendWebGL implements KernelBackend {
     const program = ENV.get('WEBGL_PACK_BINARY_OPERATIONS') ?
         new BinaryOpPackedProgram(binaryop_packed_gpu.MAX, a.shape, b.shape) :
         new BinaryOpProgram(binaryop_gpu.MAX, a.shape, b.shape);
-    const customSetup = program.getCustomSetupFunc();
-    return this.compileAndRun(program, [a, b], null, customSetup);
+    return this.compileAndRun(program, [a, b]);
   }
 
   all(x: Tensor, axes: number[]): Tensor {
@@ -1468,8 +1477,7 @@ export class MathBackendWebGL implements KernelBackend {
     const output = usePackedOp ?
         this.makePackedTensor(program.outputShape, dtype) as T :
         this.makeOutputArray(program.outputShape, dtype) as T;
-    const customSetup = program.getCustomSetupFunc();
-    return this.compileAndRun<T>(program, [a, b], output, customSetup);
+    return this.compileAndRun<T>(program, [a, b], output);
   }
 
   ceil<T extends Tensor>(x: T): T {
@@ -1485,6 +1493,22 @@ export class MathBackendWebGL implements KernelBackend {
   sign<T extends Tensor>(x: T): T {
     const program = new UnaryOpProgram(x.shape, unary_op.SIGN);
     return this.compileAndRun(program, [x]) as T;
+  }
+
+  isNaN<T extends Tensor>(x: T): T {
+    const program = new UnaryOpProgram(x.shape, unary_op.IS_NAN);
+    const output = this.makeOutputArray(program.outputShape, 'bool');
+    return this.compileAndRun(program, [x], output) as T;
+  }
+  isInf<T extends Tensor>(x: T): T {
+    const program = new UnaryOpProgram(x.shape, unary_op.IS_INF);
+    const output = this.makeOutputArray(program.outputShape, 'bool');
+    return this.compileAndRun(program, [x], output) as T;
+  }
+  isFinite<T extends Tensor>(x: T): T {
+    const program = new UnaryOpProgram(x.shape, unary_op.IS_FINITE);
+    const output = this.makeOutputArray(program.outputShape, 'bool');
+    return this.compileAndRun(program, [x], output) as T;
   }
 
   round<T extends Tensor>(x: T): T {
@@ -1514,8 +1538,7 @@ export class MathBackendWebGL implements KernelBackend {
     } else {
       program = new UnaryOpProgram(x.shape, unary_op.LOG);
     }
-    const customSetup = program.getCustomSetupFunc();
-    return this.compileAndRun(program, [x], null, customSetup) as T;
+    return this.compileAndRun(program, [x]) as T;
   }
 
   log1p<T extends Tensor>(x: T): T {
@@ -1660,8 +1683,7 @@ export class MathBackendWebGL implements KernelBackend {
     const program = ENV.get('WEBGL_PACK_BINARY_OPERATIONS') ?
         new BinaryOpPackedProgram(binaryop_packed_gpu.ATAN2, a.shape, b.shape) :
         new BinaryOpProgram(binaryop_gpu.ATAN2, a.shape, b.shape);
-    const customSetup = program.getCustomSetupFunc();
-    return this.compileAndRun(program, [a, b], null, customSetup) as T;
+    return this.compileAndRun(program, [a, b]) as T;
   }
 
   sinh<T extends Tensor>(x: T): T {
@@ -1686,14 +1708,12 @@ export class MathBackendWebGL implements KernelBackend {
 
   acosh<T extends Tensor>(x: T): T {
     const program = new UnaryOpProgram(x.shape, unary_op.ACOSH);
-    const customSetup = program.getCustomSetupFunc();
-    return this.compileAndRun(program, [x], null, customSetup) as T;
+    return this.compileAndRun(program, [x]) as T;
   }
 
   atanh<T extends Tensor>(x: T): T {
     const program = new UnaryOpProgram(x.shape, unary_op.ATANH);
-    const customSetup = program.getCustomSetupFunc();
-    return this.compileAndRun(program, [x], null, customSetup) as T;
+    return this.compileAndRun(program, [x]) as T;
   }
 
   erf<T extends Tensor>(x: T): T {
@@ -1810,7 +1830,7 @@ export class MathBackendWebGL implements KernelBackend {
     const w2Row = filter.reshape([1, sharedDim, -1]) as Tensor3D;
 
     const im2ColProgram =
-        new Im2ColProgram(x2ColShape, xSqueezed.shape, convInfo);
+        new Im2ColPackedProgram(x2ColShape, xSqueezed.shape, convInfo);
     const im2Col =
         this.compileAndRun<Tensor2D>(im2ColProgram, [xSqueezed]).reshape([
           1, x2ColShape[0], x2ColShape[1]
@@ -2323,7 +2343,8 @@ export class MathBackendWebGL implements KernelBackend {
       query = this.startTimer();
     }
 
-    gpgpu_math.runProgram(binary, inputsData, outputData, customSetup);
+    gpgpu_math.runProgram(
+        this.gpgpu, binary, inputsData, outputData, customSetup);
 
     const numBytesBeforePaging = ENV.get('WEBGL_NUM_MB_BEFORE_PAGING') * 1024;
     if (pageToCpu && this.numBytesInGPU > numBytesBeforePaging) {
@@ -2367,15 +2388,13 @@ export class MathBackendWebGL implements KernelBackend {
     if (this.disposed) {
       return;
     }
-    for (const key in this.binaryCache) {
-      this.gpgpu.deleteProgram(this.binaryCache[key].webGLProgram);
-    }
     this.textureManager.dispose();
     this.canvas.remove();
     if (this.fromPixels2DContext != null) {
       this.fromPixels2DContext.canvas.remove();
     }
     if (this.gpgpuCreatedLocally) {
+      this.gpgpu.program = null;
       this.gpgpu.dispose();
     }
     this.disposed = true;
