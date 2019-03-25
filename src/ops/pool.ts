@@ -16,11 +16,11 @@
  */
 
 import {ENV} from '../environment';
-import {Tensor3D, Tensor4D, Tensor5D} from '../tensor';
-import {NamedTensorMap} from '../tensor_types';
+import {Tensor, Tensor3D, Tensor4D} from '../tensor';
 import {convertToTensor} from '../tensor_util_env';
 import {TensorLike} from '../types';
 import * as util from '../util';
+
 import {batchToSpaceND, spaceToBatchND} from './array_ops';
 import * as conv from './conv';
 import * as conv_util from './conv_util';
@@ -83,8 +83,8 @@ function maxPoolImpl_<T extends Tensor3D|Tensor4D>(
   const convInfo = conv_util.computePool2DInfo(
       x4D.shape, filterSize, strides, dilations, pad, dimRoundingMode);
 
-  const grad = (dy: Tensor4D, saved: NamedTensorMap) => {
-    const {x4D, y} = saved;
+  const grad = (dy: Tensor4D, saved: Tensor[]) => {
+    const [x4D, y] = saved;
     return {
       x: () => maxPoolBackprop(
           dy, x4D as Tensor4D, y as Tensor4D, filterSize, strides, dilations,
@@ -94,7 +94,7 @@ function maxPoolImpl_<T extends Tensor3D|Tensor4D>(
 
   const res = ENV.engine.runKernel((backend, save) => {
     const y = backend.maxPool(x4D, convInfo);
-    save({x4D, y});
+    save([x4D, y]);
     return y;
   }, {x: x4D}, grad);
   if (reshapedTo4D) {
