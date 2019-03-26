@@ -87,7 +87,7 @@ import {OneHotProgram} from './webgl/onehot_gpu';
 import {PackProgram} from './webgl/pack_gpu';
 import {PadProgram} from './webgl/pad_gpu';
 import {PadPackedProgram} from './webgl/pad_packed_gpu';
-import {Pool2DProgram} from './webgl/pool_gpu';
+import {Pool2DProgram, Pool3DProgram} from './webgl/pool_gpu';
 import {ReduceProgram} from './webgl/reduce_gpu';
 import {ReshapePackedProgram} from './webgl/reshape_packed_gpu';
 import {ResizeBilinearBackpropProgram} from './webgl/resize_bilinear_backprop_gpu';
@@ -1950,8 +1950,11 @@ export class MathBackendWebGL implements KernelBackend {
     return this.compileAndRun(avgPoolBackpropProgram, [dy], output) as Tensor4D;
   }
 
-  maxPool3d(): Tensor5D {
-    throw new Error('Not yet implemented');
+  maxPool3d(x: Tensor5D, convInfo: Conv3DInfo): Tensor5D {
+    const program = new Pool3DProgram(convInfo, 'max', false);
+    const output =
+        this.makeOutputArray(program.outputShape, x.dtype) as Tensor5D;
+    return this.compileAndRun(program, [x], output);
   }
 
   cast<T extends Tensor>(x: T, dtype: DataType): T {

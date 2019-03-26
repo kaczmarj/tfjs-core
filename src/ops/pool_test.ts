@@ -17,9 +17,9 @@
 
 import * as tf from '../index';
 import {describeWithFlags} from '../jasmine_util';
-import { ALL_ENVS, CPU_ENVS, expectArraysClose} from '../test_util';
+import { ALL_ENVS, expectArraysClose} from '../test_util';
 
-describeWithFlags('maxPool3D', CPU_ENVS, () => {
+describeWithFlags('maxPool3D', ALL_ENVS, () => {
   // ```python
   // x = np.ones((1, 1, 1, 1, 1), dtype=np.float32)
   // tf.nn.max_pool3d(x, 1, 1, 'SAME')
